@@ -346,6 +346,10 @@ public class UserProcess {
 	return 0;
     }
 
+    private int handleOpen() {
+        
+    }
+
 
     private static final int
         syscallHalt = 0,
@@ -391,6 +395,9 @@ public class UserProcess {
 	switch (syscall) {
 	case syscallHalt:
 	    return handleHalt();
+
+    case syscallOpen: 
+        return handleOpen();
 
 
 	default:

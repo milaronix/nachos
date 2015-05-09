@@ -27,6 +27,15 @@ public class UserProcess {
 	pageTable = new TranslationEntry[numPhysPages];
 	for (int i=0; i<numPhysPages; i++)
 	    pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
+
+    for (int i=0; i<16; i++) {
+         fdt[i] = new FileDescriptor();
+    }
+    
+    fdt[0].file = UserKernel.console.openForReading();
+
+    fdt[1].file = UserKernel.console.openForWriting();  
+    
     }
     
     /**
@@ -348,19 +357,62 @@ public class UserProcess {
 
     private int handleOpen(int name) {
 
+        if (name < 0) {                                                      /*@BDA*/ 
+            return -1;                                                     /*@BDA*/
+        } 
+
         String filename = readVirtualMemoryString(name, 256);
 
-        OpenFile file = UserKernel.fileSystem.open(filename, false);
+        OpenFile file = ThreadedKernel.fileSystem.open(filename, false);
 
         if (file == null) {
             return -1;
         }
 
-        return 0;
+        int fdi = -1;
+
+        for (int i = 0; i < 16; i++) {
+            if (fdt[i].file == null)
+                fdi = i;
+        }
+
+        if (fdi < 0) {
+            return -1;
+        }
+
+        fdt[fdi].filename = filename;
+        fdt[fdi].file = file;
+        return fdi;
     }
 
-    private int handleCreate(int a0) {
-        return a0;
+    private int handleCreate(int name) {
+
+        if (name < 0) {                                                      /*@BDA*/ 
+            return -1;                                                     /*@BDA*/
+        } 
+
+        String filename = readVirtualMemoryString(name, 256);
+
+        OpenFile file = ThreadedKernel.fileSystem.open(filename, true);
+
+        if (file == null) {
+            return -1;
+        }
+
+        int fdi = -1;
+
+        for (int i = 0; i < 16; i++) {
+            if (fdt[i].file == null)
+                fdi = i;
+        }
+
+        if (fdi < 0) {
+            return -1;
+        }
+
+        fdt[fdi].filename = filename;
+        fdt[fdi].file = file;
+        return fdi;
     }
 
     private int handleRead(int a0, int a1, int a2) {
@@ -498,4 +550,13 @@ public class UserProcess {
 	
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
+
+    public class FileDescriptor {
+        public FileDescriptor() {
+        }
+        private  String   filename = "";
+        private  OpenFile file = null;
+    } 
+
+    private FileDescriptor fdt[] = new FileDescriptor[16];
 }

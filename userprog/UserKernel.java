@@ -4,6 +4,8 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
+import java.util.HashMap;
+import java.util.LinkedList;
 /**
  * A kernel that can support multiple user processes.
  */
@@ -27,6 +29,11 @@ public class UserKernel extends ThreadedKernel {
 	Machine.processor().setExceptionHandler(new Runnable() {
 		public void run() { exceptionHandler(); }
 	    });
+
+    int numPhysPages = Machine.processor().getNumPhysPages();     // @BAA
+    for(int i = 0; i < numPhysPages; i++)                         // @BAA          
+        pageTable.add(i); 
+
     }
 
     /**
@@ -107,9 +114,92 @@ public class UserKernel extends ThreadedKernel {
 	super.terminate();
     }
 
+    /**
+     * Return number of a free page.
+     * If page talbe is empty, return -1 otherwise return free page number.
+     */
+    public static int getFreePage() {
+        int pageNumber = -1;
+        Machine.interrupt().disable();
+        if (pageTable.isEmpty() == false)
+           pageNumber = pageTable.removeFirst();
+        Machine.interrupt().enable();
+        return pageNumber;
+    }
+
+    /**
+     * Add a free page into page linked list.
+     */
+    public static void addFreePage(int pageNumber) {
+       Lib.assertTrue(pageNumber >= 0
+           && pageNumber < Machine.processor().getNumPhysPages());
+       Machine.interrupt().disable();
+       pageTable.add(pageNumber);
+       Machine.interrupt().enable();
+    }
+
+
+    /**
+     * return next Pid
+     */
+    public static int getNextPid() {
+        int retval;
+        Machine.interrupt().disable();
+        retval = ++nextPid;
+        Machine.interrupt().enabled();
+        return nextPid;
+    }
+
+    /**
+     * get process from process map by pid
+     */
+    public static UserProcess getProcessByID(int pid) {
+        return processMap.get(pid);
+    }
+
+    /**
+     * register a process to the map in Kernel 
+     */
+    public static UserProcess registerProcess(int pid, UserProcess process) {
+        UserProcess insertedProcess;
+        Machine.interrupt().disable();
+        insertedProcess = processMap.put(pid, process);
+        Machine.interrupt().enabled();
+        return insertedProcess;
+    }
+
+    /**
+     * unregister a process in the process map 
+     */
+    public static UserProcess unregisterProcess(int pid) {
+        UserProcess deletedProcess;
+        Machine.interrupt().disable();
+
+        /* Remove value for key pid*/
+        deletedProcess = processMap.remove(pid);
+
+        Machine.interrupt().enabled();
+
+        return deletedProcess;
+    }
+
     /** Globally accessible reference to the synchronized console. */
     public static SynchConsole console;
 
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
+
+    /** maintain a global linked list of free physical pages.    */  
+    private static LinkedList<Integer> pageTable                   
+                         = new LinkedList<Integer>();              
+    
+    /** Maintain a static counter which indicates the next process ID
+     * to assign, assume that the process ID counter will not overflow.
+     */
+    private static int nextPid = 0;                                
+
+    /** maintain a map which stores processes, key is pid,
+     * value is the process which holds the pid.                   */
+    private static HashMap<Integer, UserProcess>
+              processMap = new HashMap<Integer, UserProcess>();
 }
